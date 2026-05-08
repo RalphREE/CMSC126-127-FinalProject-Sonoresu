@@ -6,8 +6,8 @@
 
 // --- Connection Settings ------------------------------------
 define('DB_HOST', 'localhost');
-define('DB_USER', 'root');       // Change to your phpMyAdmin user
-define('DB_PASS', '');           // Change to your phpMyAdmin password
+define('DB_USER', 'root');       
+define('DB_PASS', '');           
 define('DB_NAME', 'sonoresu_db');
 // ------------------------------------------------------------
 

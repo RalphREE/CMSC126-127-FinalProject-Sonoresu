@@ -13,16 +13,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Always hash passwords. NEVER store them in plain text.
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-        // 1. Check if the email is already in use
-        $check_stmt = $conn->prepare("SELECT user_id FROM Users WHERE email = ?");
-        $check_stmt->bind_param("s", $email);
+        // 1. Check if the email OR username is already in use
+        $check_stmt = $conn->prepare("SELECT email, username FROM Users WHERE email = ? OR username = ?");
+        $check_stmt->bind_param("ss", $email, $username);
         $check_stmt->execute();
-        $check_stmt->store_result();
+        $result = $check_stmt->get_result();
 
-        if ($check_stmt->num_rows > 0) {
-            $message = "Error: That email is already registered.";
+        if ($result->num_rows > 0) {
+            // Determine exactly what is already taken for better user feedback
+            $email_taken = false;
+            $username_taken = false;
+
+            while ($row = $result->fetch_assoc()) {
+                if (strtolower($row['email']) === strtolower($email)) {
+                    $email_taken = true;
+                }
+                if (strtolower($row['username']) === strtolower($username)) {
+                    $username_taken = true;
+                }
+            }
+
+            if ($email_taken && $username_taken) {
+                $message = "Error: Both the username and email are already taken.";
+            } elseif ($email_taken) {
+                $message = "Error: That email is already registered.";
+            } else {
+                $message = "Error: That username is already taken.";
+            }
         } else {
-            // 2. Insert the new user using a prepared statement
+            // 2. Neither exists, so insert the new user using a prepared statement
             $insert_stmt = $conn->prepare("INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)");
             $insert_stmt->bind_param("sss", $username, $email, $hashed_password);
             
