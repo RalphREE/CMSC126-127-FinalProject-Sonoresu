@@ -2,16 +2,22 @@
 // public/index.php
 session_start();
 
-// Authentication Guard: Redirect to login if the session variable isn't set
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
 $vibe_message = "";
-// Capturing input - for now, it's stored but not processed by an API
+
+// 1. Check if a new vibe was just submitted on THIS page
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['vibe_input'])) {
     $vibe_message = "Current Vibe: " . htmlspecialchars($_POST['vibe_input']);
+} 
+// 2. OR check if there was a vibe saved from the login page
+elseif (isset($_SESSION['temp_vibe'])) {
+    $vibe_message = "Current Vibe: " . htmlspecialchars($_SESSION['temp_vibe']);
+    // Clear it so it doesn't stay there forever if they refresh
+    unset($_SESSION['temp_vibe']); 
 }
 ?>
 <!DOCTYPE html>
