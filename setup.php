@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-//  setup.php — Sonoresu DB Initializer
+//  setup.php — Sonoresu DB Builder
 //  Run once via browser or CLI to create the database & tables.
 // ============================================================
 
@@ -21,7 +21,7 @@ if ($conn->connect_error) {
     die("<b>Connection failed:</b> " . htmlspecialchars($conn->connect_error));
 }
 
-// ── Step 1: Create Database ──────────────────────────────────
+// 1: Create Database
 $sql = "CREATE DATABASE IF NOT EXISTS `" . DB_NAME . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
 if ($conn->query($sql)) {
     $success[] = "Database <code>" . DB_NAME . "</code> is ready.";
@@ -31,7 +31,7 @@ if ($conn->query($sql)) {
 
 $conn->select_db(DB_NAME);
 
-// ── Step 2: Define Tables ────────────────────────────────────
+// 2: Define Tables 
 $tables = [];
 
 $tables['Users'] = "
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `Interaction` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ";
 
-// ── Step 3: Run Each Table Statement ─────────────────────────
+// 3: Run Each Table Statement
 foreach ($tables as $name => $sql) {
     if ($conn->query($sql)) {
         $success[] = "Table <code>$name</code> is ready.";
@@ -98,7 +98,7 @@ foreach ($tables as $name => $sql) {
 
 $conn->close();
 
-// ── Step 4: Output Results ───────────────────────────────────
+// 4: Output Results
 ?>
 <!DOCTYPE html>
 <html lang="en">

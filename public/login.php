@@ -3,9 +3,14 @@
 session_start();
 require_once '../config/db.php';
 
+// Initialize variables to avoid undefined warnings
+$vibe_message = '';
+$login_error = '';
+
 // 1. CAPTURE VIBE: If they enter a vibe before logging in, save it to the session
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['vibe_input'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['vibe_input']) && !empty($_POST['vibe_input'])) {
     $_SESSION['temp_vibe'] = $_POST['vibe_input'];
+    $vibe_message = "Vibe captured: " . htmlspecialchars($_POST['vibe_input']);
 }
 
 // 2. AUTHENTICATION: If they are already logged in, go to index
@@ -14,15 +19,42 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
-// ... rest of your existing login logic (password verification, etc.) ...
-// Inside your successful login block, ensure it redirects:
-if (password_verify($password, $user['password_hash'])) {
-    $_SESSION['user_id'] = $user['user_id'];
-    $_SESSION['username'] = $user['username'];
+// 3. LOGIN FORM SUBMISSION: Handle login credentials
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_POST['password'])) {
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
     
-    // Redirect to index - the vibe is already safe in $_SESSION['temp_vibe']
-    header("Location: index.php");
-    exit;
+    // Validate inputs
+    if (empty($email) || empty($password)) {
+        $login_error = "Please enter both email and password.";
+    } else {
+        // Prepare statement to prevent SQL injection
+        $stmt = $conn->prepare("SELECT user_id, username, email, password_hash FROM Users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 1) {
+            $user = $result->fetch_assoc();
+            
+            // Verify password
+            if (password_verify($password, $user['password_hash'])) {
+                // Successful login
+                $_SESSION['user_id'] = $user['user_id'];
+                $_SESSION['username'] = $user['username'];
+                
+                // Redirect to index - the vibe is already safe in $_SESSION['temp_vibe']
+                header("Location: index.php");
+                exit;
+            } else {
+                $login_error = "Invalid email or password.";
+            }
+        } else {
+            $login_error = "Invalid email or password.";
+        }
+        
+        $stmt->close();
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -118,6 +150,10 @@ if (password_verify($password, $user['password_hash'])) {
             letter-spacing: 1px;
         }
 
+        .login-btn:hover {
+            background: #333;
+        }
+
         /* Quick Picks Grid */
         .quick-picks { text-align: left; }
         .quick-picks h3 { margin-bottom: 20px; font-size: 1.4rem; }
@@ -139,6 +175,32 @@ if (password_verify($password, $user['password_hash'])) {
         .square { width: 55px; height: 55px; background: #333; border-radius: 4px; flex-shrink: 0; }
         .song-meta strong { display: block; font-size: 0.9rem; }
         .song-meta small { color: #444; font-size: 0.75rem; }
+
+        .error-message {
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.85rem;
+        }
+
+        .success-message {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-layout {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -149,8 +211,8 @@ if (password_verify($password, $user['password_hash'])) {
             <form method="POST">
                 <input type="text" name="vibe_input" class="vibe-box" placeholder="✨ e.g. morning dawn sipping coffee" autocomplete="off">
             </form>
-            <?php if ($vibe_message): ?>
-                <p style="margin-top: 15px;"><strong><?php echo $vibe_message; ?></strong></p>
+            <?php if (!empty($vibe_message)): ?>
+                <p class="success-message"><?php echo $vibe_message; ?></p>
             <?php endif; ?>
         </header>
 
@@ -160,18 +222,19 @@ if (password_verify($password, $user['password_hash'])) {
                     <img src="https://via.placeholder.com/400/333333/666666?text=Sonoresu+Visual" alt="Music Visual">
                 </div>
                 <h2>Ready to play?</h2>
-                <p style="color: var(--sub-text);">Sign in to generate your custom vibe-based soundtrack.</p>
+                <p style="color: var(--sub-text);">Sign in to save your generated custom vibe-based soundtrack, see the playlist of others, and more!</p>
             </section>
 
             <aside class="sidebar-card">
                 <h2 style="margin-top:0;">Sign In</h2>
-                <?php if ($login_error): ?>
-                    <p style="color: #721c24; font-size: 0.85rem;"><?php echo $login_error; ?></p>
+                
+                <?php if (!empty($login_error)): ?>
+                    <div class="error-message"><?php echo $login_error; ?></div>
                 <?php endif; ?>
                 
                 <form class="login-form" method="POST">
                     <label style="font-size: 0.8rem; font-weight: bold;">EMAIL</label>
-                    <input type="email" name="email" required placeholder="your@email.com">
+                    <input type="email" name="email" required placeholder="your@email.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
                     
                     <label style="font-size: 0.8rem; font-weight: bold;">PASSWORD</label>
                     <input type="password" name="password" required placeholder="••••••••">
