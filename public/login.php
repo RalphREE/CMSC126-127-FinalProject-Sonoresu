@@ -1,265 +1,279 @@
 <?php
 // public/login.php
 session_start();
-require_once '../config/db.php';
+require_once '../config/db.php'; // Ensure path is correct
 
-// Initialize variables to avoid undefined warnings
-$vibe_message = '';
-$login_error = '';
+$login_error = "";
+$show_login_prompt = false;
 
-// 1. CAPTURE VIBE: If they enter a vibe before logging in, save it to the session
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['vibe_input']) && !empty($_POST['vibe_input'])) {
-    $_SESSION['temp_vibe'] = $_POST['vibe_input'];
-    $vibe_message = "Vibe captured: " . htmlspecialchars($_POST['vibe_input']);
-}
-
-// 2. AUTHENTICATION: If they are already logged in, go to index
+// If user is ALREADY logged in, send them straight to Sonorous Couch
 if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+    header("Location: sonorous_couch.php");
     exit;
 }
 
-// 3. LOGIN FORM SUBMISSION: Handle login credentials
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_POST['password'])) {
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
+// Handle Form Submissions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // Validate inputs
-    if (empty($email) || empty($password)) {
-        $login_error = "Please enter both email and password.";
-    } else {
-        // Prepare statement to prevent SQL injection
-        $stmt = $conn->prepare("SELECT user_id, username, email, password_hash FROM Users WHERE email = ?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows === 1) {
-            $user = $result->fetch_assoc();
-            
-            // Verify password
-            if (password_verify($password, $user['password_hash'])) {
-                // Successful login
-                $_SESSION['user_id'] = $user['user_id'];
-                $_SESSION['username'] = $user['username'];
-                
-                // Redirect to index - the vibe is already safe in $_SESSION['temp_vibe']
-                header("Location: index.php");
-                exit;
-            } else {
-                $login_error = "Invalid email or password.";
-            }
+    // 1. Guest tried to enter a vibe without being logged in
+    if (isset($_POST['vibe_input']) && !empty($_POST['vibe_input'])) {
+        $show_login_prompt = true;
+        $_SESSION['temp_vibe'] = $_POST['vibe_input']; // Save their vibe for after they log in
+    }
+    
+    // 2. User is trying to Log In
+    elseif (isset($_POST['email']) && isset($_POST['password'])) {
+        $email = trim($_POST['email']);
+        $password = $_POST['password'];
+
+        if (empty($email) || empty($password)) {
+            $login_error = "Please enter both email and password.";
         } else {
-            $login_error = "Invalid email or password.";
+            $stmt = $conn->prepare("SELECT user_id, username, password_hash FROM Users WHERE email = ?");
+            if ($stmt) {
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($user = $result->fetch_assoc()) {
+                    if (password_verify($password, $user['password_hash'])) {
+                        $_SESSION['user_id'] = $user['user_id'];
+                        $_SESSION['username'] = $user['username'];
+                        header("Location: sonorous_couch.php");
+                        exit;
+                    } else {
+                        $login_error = "Invalid email or password.";
+                    }
+                } else {
+                    $login_error = "Invalid email or password.";
+                }
+                $stmt->close();
+            } else {
+                $login_error = "Database connection error.";
+            }
         }
-        
-        $stmt->close();
     }
 }
+
+// Array of random Original Pinoy Music (OPM)
+$opm_songs = [
+    ["title" => "Ang Huling El Bimbo", "artist" => "Eraserheads"],
+    ["title" => "Kathang Isip", "artist" => "Ben&Ben"],
+    ["title" => "Mundo", "artist" => "IV Of Spades"],
+    ["title" => "Raining in Manila", "artist" => "Lola Amour"],
+    ["title" => "Jopay", "artist" => "Mayonnaise"],
+    ["title" => "Tadhana", "artist" => "Up Dharma Down"],
+    ["title" => "Uhaw (Tayong Lahat)", "artist" => "Dilaw"],
+    ["title" => "Pasilyo", "artist" => "SunKissed Lola"],
+    ["title" => "Ere", "artist" => "juan karlos"],
+    ["title" => "Leaves", "artist" => "Ben&Ben"],
+    ["title" => "Ikaw Lang", "artist" => "NOBITA"],
+    ["title" => "Mahika", "artist" => "Adie, Janine Berdin"]
+];
+shuffle($opm_songs);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sonoresu</title>
+    <title>Sonoresu - Login</title>
+    <link rel="stylesheet" href="global.css">
+    
     <style>
-        :root {
-            --bg-color: #b5ac99;
-            --card-bg: #1e1e1e;
-            --sidebar-bg: #8e8778;
-            --sub-text: #b3b3b3;
+        /* Page-Specific Layouts Only */
+        .brand-header { text-align: center; margin-bottom: 60px; margin-top: 20px; }
+        .brand-header h1 {
+            font-family: 'Space Mono', monospace; font-size: 2.5rem; letter-spacing: 0.15em;
+            background: linear-gradient(to right, #ffffff, var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
 
-        body { 
-            font-family: 'Segoe UI', sans-serif; 
-            background-color: var(--bg-color); 
-            color: #121212; 
-            margin: 0; 
-            padding: 0; 
+        .landing-layout { 
+            display: grid; grid-template-columns: 1.2fr 400px; gap: 60px; 
+            margin-bottom: 80px; align-items: center;
         }
 
-        .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+        .hero-section h2 { font-size: 2.8rem; font-weight: 700; margin-bottom: 20px; line-height: 1.1; letter-spacing: -0.02em; }
+        .hero-section p { color: var(--muted); font-size: 1.1rem; margin-bottom: 40px; line-height: 1.6; max-width: 90%; }
         
-        .mood-header { text-align: center; margin-bottom: 50px; }
         .vibe-box {
-            background: #000;
-            color: #fff;
-            border-radius: 50px;
-            padding: 15px 30px;
-            display: inline-block;
-            border: 2px solid transparent;
-            width: 100%;
+            background: var(--surface); color: var(--text);
+            border-radius: 20px; padding: 20px 25px; width: 100%;
+            font-size: 1.1rem; border: 1px solid var(--border);
+            outline: none; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            transition: all 0.3s; margin-bottom: 20px;
+        }
+        .vibe-box:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.2), 0 10px 30px rgba(0, 0, 0, 0.4); }
+
+        .auth-prompt-banner {
+            background: rgba(108, 99, 255, 0.15); border: 1px solid var(--accent); 
+            padding: 14px 20px; border-radius: 12px; color: #b7b3ff; font-weight: 500;
+            display: flex; align-items: center; gap: 12px;
+            animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 30px;
+        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .featured-track {
+            background: linear-gradient(135deg, rgba(28,28,36,0.8) 0%, rgba(20,20,26,0.8) 100%);
+            border: 1px solid var(--border); border-radius: 16px; padding: 20px;
+            display: flex; align-items: center; gap: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); backdrop-filter: blur(10px);
             max-width: 450px;
-            font-size: 1.1rem;
-            outline: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
+        .featured-art {
+            width: 80px; height: 80px; border-radius: 12px;
+            background: linear-gradient(45deg, #000, #333);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); border: 1px solid #444;
+        }
+        .featured-info .badge {
+            display: inline-block; padding: 4px 10px; background: rgba(255,255,255,0.1);
+            border-radius: 20px; font-size: 0.7rem; font-family: 'Space Mono', monospace;
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; color: var(--muted);
+        }
+        .featured-info h4 { font-size: 1.2rem; margin-bottom: 4px; }
+        .featured-info p { color: var(--accent); font-weight: 600; font-size: 0.95rem; margin: 0; }
 
-        .dashboard-layout { 
-            display: grid; 
-            grid-template-columns: 1.5fr 1fr; 
-            gap: 30px; 
-            margin-bottom: 50px;
+        .login-card { 
+            background: var(--surface); padding: 40px 30px; 
+            border-radius: 24px; border: 1px solid var(--surface2);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
         }
-
-        .player-card { 
-            background: var(--card-bg); 
-            color: white; 
-            padding: 30px; 
-            border-radius: 12px; 
-        }
+        .login-card h3 { font-size: 1.6rem; margin-bottom: 24px; text-align: center; font-weight: 700; }
         
-        .album-art { 
-            width: 100%; 
-            aspect-ratio: 1 / 1; 
-            background: #333; 
-            border-radius: 8px; 
-            margin-bottom: 20px;
-            overflow: hidden;
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: #d1d1d6; }
+        .form-group input {
+            width: 100%; background: #0b0b0f; border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 16px; color: var(--text);
+            font-size: 0.95rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
         }
+        .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,99,255,0.15); }
 
-        .album-art img { width: 100%; height: 100%; object-fit: cover; opacity: 0.7; }
+        .btn-submit {
+            width: 100%; background: var(--accent); color: #fff; border: none;
+            border-radius: 10px; padding: 14px; font-size: 1rem; font-weight: 600;
+            cursor: pointer; transition: background 0.2s, transform 0.1s; margin-top: 10px;
+        }
+        .btn-submit:hover { background: #5b52e6; }
+        .btn-submit:active { transform: scale(0.98); }
         
-        .sidebar-card { 
-            background: var(--sidebar-bg); 
-            padding: 30px; 
-            border-radius: 12px; 
-            border: 1px solid rgba(0,0,0,0.1);
-        }
-
-        .login-form input {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0 18px 0;
-            border-radius: 6px;
-            border: none;
-            background: rgba(255,255,255,0.9);
-            box-sizing: border-box;
-        }
-
-        .login-btn {
-            background: #000;
-            color: #fff;
-            border: none;
-            padding: 14px;
-            width: 100%;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            letter-spacing: 1px;
-        }
-
-        .login-btn:hover {
-            background: #333;
-        }
-
-        /* Quick Picks Grid */
-        .quick-picks { text-align: left; }
-        .quick-picks h3 { margin-bottom: 20px; font-size: 1.4rem; }
-        .grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
-            gap: 20px; 
-        }
+        .register-link { text-align: center; margin-top: 24px; font-size: 0.9rem; color: var(--muted); }
+        .register-link a { color: var(--accent); text-decoration: none; font-weight: 600; }
+        .register-link a:hover { text-decoration: underline; }
         
+        .error-msg { 
+            color: var(--danger); font-size: 0.9rem; margin-bottom: 20px; text-align: center; 
+            background: rgba(255,107,107,0.1); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,107,107,0.2);
+        }
+
+        .quick-picks h3 { margin-bottom: 24px; font-size: 1.4rem; font-weight: 600; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
         .pick-item { 
-            background: rgba(255,255,255,0.2);
-            padding: 12px;
-            border-radius: 8px;
-            display: flex; 
-            align-items: center; 
-            gap: 15px; 
+            background: var(--surface); padding: 14px; border-radius: 12px;
+            display: flex; align-items: center; gap: 16px; border: 1px solid var(--surface2);
+            transition: transform 0.2s, border-color 0.2s; cursor: pointer;
         }
-        
-        .square { width: 55px; height: 55px; background: #333; border-radius: 4px; flex-shrink: 0; }
-        .song-meta strong { display: block; font-size: 0.9rem; }
-        .song-meta small { color: #444; font-size: 0.75rem; }
+        .pick-item:hover { transform: translateY(-3px); border-color: var(--border); }
+        .square { width: 50px; height: 50px; background: linear-gradient(135deg, #2a2a35 0%, #1a1a24 100%); border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size: 1.2rem;}
+        .song-meta strong { display: block; font-size: 0.95rem; margin-bottom: 4px; color: var(--text);}
+        .song-meta small { color: var(--muted); font-size: 0.8rem; }
 
-        .error-message {
-            color: #721c24;
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            font-size: 0.85rem;
-        }
-
-        .success-message {
-            color: #155724;
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            padding: 10px;
-            border-radius: 6px;
-            margin-top: 15px;
-            font-size: 0.9rem;
-        }
-
-        @media (max-width: 768px) {
-            .dashboard-layout {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 900px) {
+            .landing-layout { grid-template-columns: 1fr; gap: 40px; }
+            .login-card { max-width: 500px; margin: 0 auto; width: 100%; }
+            .featured-track { max-width: 100%; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        
-        <header class="mood-header">
-            <h3>What's our mood for today?</h3>
-            <form method="POST">
-                <input type="text" name="vibe_input" class="vibe-box" placeholder="✨ e.g. morning dawn sipping coffee" autocomplete="off">
-            </form>
-            <?php if (!empty($vibe_message)): ?>
-                <p class="success-message"><?php echo $vibe_message; ?></p>
-            <?php endif; ?>
+    <div class="container" style="max-width: 1200px;">
+        <header class="brand-header">
+            <h1>SONORESU</h1>
         </header>
 
-        <main class="dashboard-layout">
-            <section class="player-card">
-                <div class="album-art">
-                    <img src="https://via.placeholder.com/400/333333/666666?text=Sonoresu+Visual" alt="Music Visual">
+        <main class="landing-layout">
+            <section class="hero-section">
+                <h2>What's your soundtrack right now?</h2>
+                <p>Describe your current feeling, a scene, or a moment. Our AI will parse your vibe and generate the perfect playlist for your exact frequency.</p>
+                
+                <form method="POST" action="login.php">
+                    <input type="text" name="vibe_input" class="vibe-box" placeholder="✨ e.g. late night driving with the windows down..." autocomplete="off">
+                </form>
+
+                <?php if ($show_login_prompt): ?>
+                    <div class="auth-prompt-banner">
+                        <span style="font-size: 1.5rem;">👋</span> 
+                        <div>
+                            <strong style="display:block; margin-bottom:2px;">Vibe captured!</strong> 
+                            <span style="font-size: 0.9rem;">Please log in or register to generate your custom playlist.</span>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <div class="featured-track">
+                    <div class="featured-art">♠️</div>
+                    <div class="featured-info">
+                        <span class="badge">Trending Vibe</span>
+                        <h4>Come Inside Of My Heart</h4>
+                        <p>IV Of Spades</p>
+                    </div>
                 </div>
-                <h2>Ready to play?</h2>
-                <p style="color: var(--sub-text);">Sign in to save your generated custom vibe-based soundtrack, see the playlist of others, and more!</p>
             </section>
 
-            <aside class="sidebar-card">
-                <h2 style="margin-top:0;">Sign In</h2>
-                
-                <?php if (!empty($login_error)): ?>
-                    <div class="error-message"><?php echo $login_error; ?></div>
+            <aside class="login-card" id="loginBox">
+                <h3>Welcome Back</h3>
+                <?php if ($login_error): ?>
+                    <div class="error-msg"><?php echo htmlspecialchars($login_error); ?></div>
                 <?php endif; ?>
-                
-                <form class="login-form" method="POST">
-                    <label style="font-size: 0.8rem; font-weight: bold;">EMAIL</label>
-                    <input type="email" name="email" required placeholder="your@email.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
-                    
-                    <label style="font-size: 0.8rem; font-weight: bold;">PASSWORD</label>
-                    <input type="password" name="password" required placeholder="••••••••">
-                    
-                    <button type="submit" class="login-btn">ENTER</button>
+
+                <form method="POST" action="login.php">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" name="email" placeholder="you@email.com" required 
+                               value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
+                               autofocus="<?php echo $show_login_prompt ? 'true' : 'false'; ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" name="password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-submit">Enter</button>
                 </form>
-                <p style="margin-top: 20px; font-size: 0.85rem;">New here? <a href="register.php" style="color: #000; font-weight: bold;">Create account</a></p>
+                
+                <div class="register-link">
+                    New to Sonoresu? <a href="register.php">Create an account</a>
+                </div>
             </aside>
         </main>
 
         <section class="quick-picks">
-            <h3>Quick picks</h3>
+            <h3>Trending OPM Frequencies</h3>
             <div class="grid">
-                <?php for($i=1; $i<=9; $i++): ?>
+                <?php 
+                $display_songs = array_slice($opm_songs, 0, 9);
+                foreach($display_songs as $song): 
+                ?>
                 <div class="pick-item">
-                    <div class="square"></div>
+                    <div class="square">💿</div>
                     <div class="song-meta">
-                        <strong>Track Title <?php echo $i; ?></strong>
-                        <small>Artist Name</small>
+                        <strong><?php echo htmlspecialchars($song['title']); ?></strong>
+                        <small><?php echo htmlspecialchars($song['artist']); ?></small>
                     </div>
                 </div>
-                <?php endfor; ?>
+                <?php endforeach; ?>
             </div>
         </section>
-
     </div>
+
+    <?php if ($show_login_prompt): ?>
+    <script>
+        if(window.innerWidth <= 900) {
+            document.getElementById('loginBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    </script>
+    <?php endif; ?>
 </body>
 </html>

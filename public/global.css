@@ -1,0 +1,63 @@
+/* global.css */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+    --bg: #0b0b0f;
+    --surface: #14141a;
+    --surface2: #1c1c24;
+    --border: #262633;
+    --accent: #6c63ff;
+    --accent2: #a78bfa;
+    --green: #1db954;
+    --text: #f3f3f5;
+    --muted: #71717a;
+    --danger: #ff6b6b;
+}
+
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+}
+
+body { 
+    font-family: 'Plus Jakarta Sans', sans-serif; 
+    background-color: var(--bg); 
+    color: var(--text); 
+    min-height: 100vh;
+    background-image: radial-gradient(circle at 10% 20%, rgba(108, 99, 255, 0.08) 0%, transparent 40%);
+}
+
+/* --- Unified Top Navigation --- */
+nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 40px; border-bottom: 1px solid var(--border);
+    background: rgba(11,11,15,.8); backdrop-filter: blur(16px); z-index: 100;
+}
+
+.logo {
+    font-family: 'Space Mono', monospace; font-weight: 700; letter-spacing: .2em;
+    background: linear-gradient(to right, #fff, var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none;
+}
+
+.nav-right { display: flex; align-items: center; gap: 20px; }
+
+.username-badge {
+    font-family: 'Space Mono', monospace; font-size: 0.9rem; color: var(--accent2);
+    padding-right: 20px; border-right: 1px solid var(--border);
+}
+
+.nav-links { display: flex; align-items: center; gap: 25px; font-size: 0.95rem; font-weight: 500; }
+.nav-links a { color: var(--muted); text-decoration: none; transition: color 0.2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links a.logout-btn { color: var(--danger); margin-left: 10px; font-weight: 600; }
+.nav-links a.logout-btn:hover { color: #ff4b4b; }
+
+/* --- Reusable Global Layouts --- */
+.container { 
+    max-width: 1000px; 
+    margin: 100px auto 0 auto; 
+    padding: 0 20px; 
+}
