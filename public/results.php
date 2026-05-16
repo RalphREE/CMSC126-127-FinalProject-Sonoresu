@@ -133,7 +133,7 @@ $current_vibe = "Late night coding in the neon rain...";
             <span class="username-badge">Hello, <?php echo $username; ?></span>
             <div class="nav-links">
                 <a href="sonorous_couch.php">Terminal</a>
-                <a href="history.php">My Playlists</a>
+                <a href="profile.php">My Playlists</a>
                 <a href="lounge.php">Global Lounge</a>
                 <a href="logout.php" class="logout-btn">Log out</a>
             </div>
@@ -256,7 +256,7 @@ $current_vibe = "Late night coding in the neon rain...";
             toast.classList.add('show');
             
             setTimeout(() => {
-                window.location.href = 'history.php'; // Updated redirect path from previous turn
+                window.location.href = 'profile.php'; // Updated redirect path from previous turn
             }, 1500);
         }
 

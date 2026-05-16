@@ -86,7 +86,7 @@ $global_feed = [
             <span class="username-badge">Hello, <?php echo $username; ?></span>
             <div class="nav-links">
                 <a href="sonorous_couch.php">Terminal</a>
-                <a href="history.php">My Playlists</a>
+                <a href="profile.php">My Playlists</a>
                 <a href="lounge.php" class="active">Global Lounge</a>
                 <a href="logout.php" class="logout-btn">Log out</a>
             </div>
