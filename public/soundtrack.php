@@ -421,7 +421,7 @@ function fmt_ms(int $ms): string {
 
 <nav>
   <div class="nav-left">
-    <a class="logo" href="index.php">SONORESU</a>
+    <a class="logo" href="sonorous_couch.php">SONORESU</a>
     <a class="back-btn" href="sonorous_couch.php">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       New playlist

@@ -128,7 +128,7 @@ $current_vibe = "Late night coding in the neon rain...";
 <body>
 
     <nav>
-        <a class="logo" href="index.php">SONORESU</a>
+        <a class="logo" href="sonorous_couch.php">SONORESU</a>
         <div class="nav-right">
             <span class="username-badge">Hello, <?php echo $username; ?></span>
             <div class="nav-links">
