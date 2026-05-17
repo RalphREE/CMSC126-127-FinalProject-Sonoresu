@@ -8,8 +8,34 @@ if (!isset($_SESSION['user_id'])) {
 }
 $username = htmlspecialchars($_SESSION['username'] ?? 'User');
 
-// Normally, you would receive the generated vibe/prompt via $_SESSION or $_POST here
+// Pull generated data from session (set by generate_playlist.php)
 $current_vibe = "Late night coding in the neon rain...";
+$activeTracks = [];
+$reserveTracks = [];
+if (!empty($_SESSION['playlist_data'])) {
+    $pd = $_SESSION['playlist_data'];
+    $current_vibe = $pd['original_prompt'] ?? $current_vibe;
+
+    // Build JS-friendly arrays from session data
+    foreach ($pd['main'] ?? [] as $i => $item) {
+        $activeTracks[] = [
+            'id' => $item['id'],
+            'title' => $item['title'] ?: ($item['query'] ?? ''),
+            'channel' => $item['channel'] ?? '',
+            'thumbnail' => $item['thumbnail'] ?? '',
+            'color' => '#2a2a3a',
+        ];
+    }
+    foreach ($pd['replacements'] ?? $pd['replacements'] ?? $pd['replacement'] ?? [] as $item) {
+        $reserveTracks[] = [
+            'id' => $item['id'],
+            'title' => $item['title'] ?: ($item['query'] ?? ''),
+            'channel' => $item['channel'] ?? '',
+            'thumbnail' => $item['thumbnail'] ?? '',
+            'color' => '#403040',
+        ];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -137,6 +163,9 @@ $current_vibe = "Late night coding in the neon rain...";
                 <a href="lounge.php">Global Lounge</a>
                 <a href="logout.php" class="logout-btn">Log out</a>
             </div>
+            <div style="margin-left:16px; display:flex; align-items:center; gap:10px;">
+                <button id="debugToggle" class="btn-cancel" style="padding:8px 12px; font-size:0.85rem;">Toggle Debug</button>
+            </div>
         </div>
     </nav>
 
@@ -165,6 +194,11 @@ $current_vibe = "Late night coding in the neon rain...";
                 </div>
         </div>
 
+        <details id="debugDumpWrapper" style="margin-top:18px; display:none;">
+            <summary style="cursor:pointer; font-weight:600;">Session Playlist Data (debug)</summary>
+            <pre id="debugDump" style="background:#0b0b10; color:#d7d7d7; padding:12px; border-radius:8px; overflow:auto; max-height:320px;"></pre>
+        </details>
+
         <h3 class="section-title" style="margin-top: 50px;">Alternative Tracks <span>Replace discarded songs</span></h3>
         <div class="reserve-grid" id="reservePlaylist">
             </div>
@@ -175,62 +209,152 @@ $current_vibe = "Late night coding in the neon rain...";
     </div>
 
     <script>
-        let activeTracks = [
-            { id: "v1", title: "Lofi Hip Hop Radio - Beats to Relax/Study to", channel: "Lofi Girl", color: "#3a2a45" },
-            { id: "v2", title: "Midnight City (Official Video)", channel: "M83", color: "#1a3a45" },
-            { id: "v3", title: "Cyberpunk 2077 - V's Apartment Theme 1 Hour", channel: "Ambient Worlds", color: "#451a2a" },
-            { id: "v4", title: "Synthwave Mix - 1 Hour of Retro Electro Music", channel: "The Prime Thanatos", color: "#451a45" },
-            { id: "v5", title: "Rain Sounds for Sleep & Focus", channel: "Relaxing White Noise", color: "#2a2a3a" }
-        ];
-
-        let reserveTracks = [
-            { id: "r1", title: "Night Rider - 80s Retrowave/Synthwave", channel: "Astrophysics", color: "#402030" },
-            { id: "r2", title: "Chillhop Radio - Jazzy & Lofi Hip Hop", channel: "Chillhop Music", color: "#204030" },
-            { id: "r3", title: "Blade Runner Blues", channel: "Vangelis", color: "#203040" },
-            { id: "r4", title: "Resonance", channel: "HOME", color: "#403020" },
-            { id: "r5", title: "Gosh", channel: "Jamie xx", color: "#302040" },
-            { id: "r6", title: "Teardrop", channel: "Massive Attack", color: "#304020" },
-            { id: "r7", title: "Nightcall", channel: "Kavinsky", color: "#402040" },
-            { id: "r8", title: "Space Song", channel: "Beach House", color: "#204040" },
-            { id: "r9", title: "Clair de Lune", channel: "Flight Facilities", color: "#404020" },
-            { id: "r10", title: "After Hours", channel: "The Weeknd", color: "#402020" }
-        ];
+        let activeTracks = <?php echo json_encode($activeTracks, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
+        let reserveTracks = <?php echo json_encode($reserveTracks, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
 
         const activeContainer = document.getElementById('activePlaylist');
         const reserveContainer = document.getElementById('reservePlaylist');
         const activeCountLabel = document.getElementById('activeCount');
+        const debugToggle = document.getElementById('debugToggle');
+        const debugDumpWrapper = document.getElementById('debugDumpWrapper');
+        const debugDump = document.getElementById('debugDump');
+        const serverPlaylistData = <?php echo json_encode($pd ?? [], JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
 
         function renderUI() {
             activeContainer.innerHTML = '';
-            activeTracks.forEach(track => {
-                activeContainer.innerHTML += `
-                    <div class="yt-card">
-                        <div class="yt-thumb" style="background: linear-gradient(45deg, #111, ${track.color});"></div>
-                        <div class="yt-info">
-                            <div class="yt-title">${track.title}</div>
-                            <div class="yt-channel">${track.channel}</div>
-                        </div>
-                        <button class="action-btn btn-remove" onclick="removeTrack('${track.id}')" title="Remove Track">✕</button>
-                    </div>
-                `;
-            });
+                activeTracks.forEach(track => {
+                    // normalize video id if a full URL was stored
+                    const normalizeId = (id) => {
+                        if (!id) return '';
+                        try {
+                            // if it's a URL, extract v= or last path
+                            if (id.includes('youtube.com') || id.includes('youtu.be')) {
+                                const url = new URL(id.startsWith('http') ? id : ('https://' + id));
+                                if (url.hostname.includes('youtu.be')) return url.pathname.slice(1);
+                                const v = url.searchParams.get('v');
+                                if (v) return v;
+                                // fallback: last path segment
+                                const segs = url.pathname.split('/').filter(Boolean);
+                                return segs.length ? segs[segs.length-1] : id;
+                            }
+                        } catch (e) {}
+                        return id;
+                    };
+
+                    const vid = normalizeId(track.id || '');
+                    let thumbnail = track.thumbnail || '';
+                    if (!thumbnail && vid) {
+                        thumbnail = 'https://i.ytimg.com/vi/' + encodeURIComponent(vid) + '/hqdefault.jpg';
+                    }
+
+                    // create elements to avoid CSS string escaping issues
+                    const card = document.createElement('div'); card.className = 'yt-card';
+                    const thumb = document.createElement('div'); thumb.className = 'yt-thumb';
+                    thumb.setAttribute('data-video-id', vid);
+                    thumb.onclick = function(){ togglePlay(this, vid); };
+                    if (thumbnail) {
+                        thumb.style.backgroundImage = `url(${thumbnail})`;
+                        thumb.style.backgroundSize = 'cover';
+                        thumb.style.backgroundPosition = 'center';
+                    } else {
+                        thumb.style.background = `linear-gradient(45deg, #111, ${track.color})`;
+                    }
+                    const info = document.createElement('div'); info.className = 'yt-info';
+                    const title = document.createElement('div'); title.className = 'yt-title'; title.textContent = track.title;
+                    const channel = document.createElement('div'); channel.className = 'yt-channel'; channel.textContent = track.channel;
+                    const btn = document.createElement('button'); btn.className = 'action-btn btn-remove'; btn.title = 'Remove Track'; btn.textContent = '✕'; btn.onclick = function(){ removeTrack(track.id); };
+
+                    info.appendChild(title); info.appendChild(channel);
+                    card.appendChild(thumb); card.appendChild(info); card.appendChild(btn);
+                    activeContainer.appendChild(card);
+                });
             activeCountLabel.textContent = `${activeTracks.length} Track${activeTracks.length !== 1 ? 's' : ''}`;
 
             reserveContainer.innerHTML = '';
             reserveTracks.forEach(track => {
-                reserveContainer.innerHTML += `
-                    <div class="yt-card">
-                        <div class="yt-thumb" style="background: linear-gradient(45deg, #111, ${track.color});"></div>
-                        <div class="yt-info">
-                            <div class="yt-title">${track.title}</div>
-                            <div class="yt-channel">${track.channel}</div>
-                        </div>
-                        <button class="action-btn btn-add" onclick="addTrack('${track.id}')">
-                            <span>＋</span> Replace / Add
-                        </button>
-                    </div>
-                `;
+                const normalizeId = (id) => {
+                    if (!id) return '';
+                    try {
+                        if (id.includes('youtube.com') || id.includes('youtu.be')) {
+                            const url = new URL(id.startsWith('http') ? id : ('https://' + id));
+                            if (url.hostname.includes('youtu.be')) return url.pathname.slice(1);
+                            const v = url.searchParams.get('v');
+                            if (v) return v;
+                            const segs = url.pathname.split('/').filter(Boolean);
+                            return segs.length ? segs[segs.length-1] : id;
+                        }
+                    } catch (e) {}
+                    return id;
+                };
+                const vid = normalizeId(track.id || '');
+                let thumbnail = track.thumbnail || '';
+                if (!thumbnail && vid) {
+                    thumbnail = 'https://i.ytimg.com/vi/' + encodeURIComponent(vid) + '/hqdefault.jpg';
+                }
+
+                const card = document.createElement('div'); card.className = 'yt-card';
+                const thumb = document.createElement('div'); thumb.className = 'yt-thumb';
+                thumb.setAttribute('data-video-id', vid);
+                thumb.onclick = function(){ togglePlay(this, vid); };
+                if (thumbnail) {
+                    thumb.style.backgroundImage = `url(${thumbnail})`;
+                    thumb.style.backgroundSize = 'cover';
+                    thumb.style.backgroundPosition = 'center';
+                } else {
+                    thumb.style.background = `linear-gradient(45deg, #111, ${track.color})`;
+                }
+                const info = document.createElement('div'); info.className = 'yt-info';
+                const title = document.createElement('div'); title.className = 'yt-title'; title.textContent = track.title;
+                const channel = document.createElement('div'); channel.className = 'yt-channel'; channel.textContent = track.channel;
+                const btn = document.createElement('button'); btn.className = 'action-btn btn-add'; btn.onclick = function(){ addTrack(track.id); }; btn.innerHTML = '<span>＋</span> Replace / Add';
+
+                info.appendChild(title); info.appendChild(channel);
+                card.appendChild(thumb); card.appendChild(info); card.appendChild(btn);
+                reserveContainer.appendChild(card);
             });
+        }
+
+        // Debug toggle: show raw session playlist_data for troubleshooting
+        if (debugToggle) {
+            debugToggle.addEventListener('click', function(){
+                if (!debugDumpWrapper) return;
+                if (debugDumpWrapper.style.display === 'none' || debugDumpWrapper.style.display === '') {
+                    debugDumpWrapper.style.display = 'block';
+                    debugDump.textContent = JSON.stringify(serverPlaylistData, null, 2);
+                } else {
+                    debugDumpWrapper.style.display = 'none';
+                }
+            });
+        }
+
+        // Toggle YouTube embed playback inside the thumbnail container
+        function togglePlay(thumbEl, videoId) {
+            // If no videoId available, do nothing
+            if (!videoId) return;
+
+            // Stop other players
+            document.querySelectorAll('.yt-thumb iframe').forEach(f => {
+                if (f.parentElement !== thumbEl) f.remove();
+            });
+
+            const existing = thumbEl.querySelector('iframe');
+            if (existing) {
+                existing.remove();
+                return;
+            }
+
+            // Create iframe embed
+            const iframe = document.createElement('iframe');
+            iframe.src = 'https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&rel=0';
+            iframe.allow = 'autoplay; encrypted-media; picture-in-picture';
+            iframe.allowFullscreen = true;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = '0';
+
+            // Clear thumb contents and insert iframe
+            thumbEl.innerHTML = '';
+            thumbEl.appendChild(iframe);
         }
 
         function removeTrack(id) {

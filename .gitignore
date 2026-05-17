@@ -1,1 +1,3 @@
-./config/api_keys.php
+config/*.php
+logs/
+logs/*.log
